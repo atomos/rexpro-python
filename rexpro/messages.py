@@ -55,6 +55,8 @@ def bytearray_to_text(data):
         return data
     elif isinstance(data, (bytes, bytearray)):
         return data.decode('UTF-8')
+    elif data is None:
+        return None
     else:  # all else fails
         print_("Defaulting no known way to handle {}: {}".format(type(data), data))
         return data
