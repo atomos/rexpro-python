@@ -17,8 +17,7 @@ class RexProBaseConnectionPool(object):
     QUEUE_CLASS = None
     CONN_CLASS = None
 
-    def __init__(self, host, port, graph_name, graph_obj_name='g', username='', password='', timeout=None,
-                 pool_size=10):
+    def __init__(self, host, port, graph_name, graph_obj_name='g', username='', password='', timeout=None):
         """
         Connection constructor
 
@@ -34,8 +33,6 @@ class RexProBaseConnectionPool(object):
         :type username: str
         :param password: the password to use for authentication (optional)
         :type password: str
-        :param pool_size: the initial connection pool size
-        :type pool_size: int
         """
 
         self.host = host
@@ -46,9 +43,7 @@ class RexProBaseConnectionPool(object):
         self.password = password
         self.timeout = timeout
 
-        self.pool_size = pool_size
         self.pool = self.QUEUE_CLASS()
-        self.size = 0
 
     def get(self, *args, **kwargs):
         """ Retrieve a rexpro connection from the pool
@@ -68,14 +63,12 @@ class RexProBaseConnectionPool(object):
         :rtype: RexProConnection
         """
         pool = self.pool
-        if self.size >= self.pool_size or pool.qsize():
+        if pool.qsize():
             return pool.get()
         else:
-            self.size += 1
             try:
                 new_item = self._create_connection(*args, **kwargs)
             except:
-                self.size -= 1
                 raise
             return new_item
 
