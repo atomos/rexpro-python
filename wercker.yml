@@ -1,6 +1,6 @@
 box: josh/python@0.0.2
 services:
-  - platinummonkey/titan-stable
+  - platinummonkey/titan-stable@0.0.6
 build:
   steps:
     - script:
