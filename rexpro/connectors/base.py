@@ -1,3 +1,4 @@
+import random
 from socket import SHUT_RDWR
 from rexpro.exceptions import RexProConnectionException
 from rexpro.messages import ErrorResponse
@@ -294,8 +295,19 @@ class RexProBaseConnection(object):
             # connect to server
             self._conn = self.SOCKET_CLASS()
             self._conn.settimeout(self.timeout)
+
+            if isinstance(self.host, list):
+                host = random.choice(self.host)
+            else:
+                host = self.host
+
+            if isinstance(self.port, list):
+                port = random.choice(self.port)
+            else:
+                port = self.port
+
             try:
-                self._conn.connect((self.host, self.port))
+                self._conn.connect((host, port))
             except Exception as e:
                 raise RexProConnectionException("Could not connect to database: %s" % e)
 
