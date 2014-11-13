@@ -428,9 +428,7 @@ class RexProBaseConnection(object):
                 if self._in_transaction:
                     transaction = False
 
-                print script, params
                 import traceback
-                print traceback.format_exc()
 
                 self._conn.send_message(
                     messages.ScriptRequest(
