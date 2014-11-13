@@ -176,19 +176,20 @@ class ErrorResponse(RexProMessage):
     CHANNEL_CONFIG_ERROR = 5
     RESULT_SERIALIZATION_ERROR = 6
 
-    def __init__(self, meta, message, **kwargs):
+    def __init__(self, meta, message, data=None, **kwargs):
         super(ErrorResponse, self).__init__(**kwargs)
         self.meta = meta
         self.meta_orig = meta
         if isinstance(self.meta, dict):
             self.meta = self.meta['flag']
         self.message = message
+        self.data = data
 
     @classmethod
     def deserialize(cls, data):
         message = msgpack.loads(data)
         session, request, meta, msg = message
-        return cls(message=bytearray_to_text(msg), meta=bytearray_to_text(meta))
+        return cls(message=bytearray_to_text(msg), meta=bytearray_to_text(meta), data=data)
 
     def raise_exception(self):
         if self.meta == self.INVALID_MESSAGE_ERROR:
@@ -204,9 +205,13 @@ class ErrorResponse(RexProMessage):
         elif self.meta == self.CHANNEL_CONFIG_ERROR:
             raise exceptions.RexProChannelConfigException(self.message)
         elif self.meta == self.RESULT_SERIALIZATION_ERROR:
-            raise exceptions.RexProSerializationException(self.message)
+            raise exceptions.RexProSerializationException("Meta: {} ({}), Message: {}, Raw Data: {}".format(
+                self.meta, type(self.meta), self.message, repr(self.data))
+            )
         else:
-            raise exceptions.RexProScriptException("Meta: {} ({}), Message: {}".format(self.meta, type(self.meta), self.message))
+            raise exceptions.RexProScriptException("Meta: {} ({}), Message: {}, Raw Data: {}".format(
+                self.meta, type(self.meta), self.message, repr(self.data))
+            )
 
 
 class SessionRequest(RexProMessage):
