@@ -315,13 +315,13 @@ class RexProBaseConnection(object):
         :param soft: Attempt to re-use the connection, if False (default), create a new socket
         :type soft: bool
         """
-        if not soft:
-            # connect to server
-            self._conn = self.SOCKET_CLASS()
-            self._conn.settimeout(self.timeout)
+        for i in range(CONNECTION_ATTEMPTS):
+            if not soft:
+                # connect to server
+                self._conn = self.SOCKET_CLASS()
+                self._conn.settimeout(self.timeout)
 
 
-            for i in range(CONNECTION_ATTEMPTS):
                 if isinstance(self.host, list):
                     host_choices = set(self.host) - self.host_blacklist
                     self.current_host = random.choice(list(host_choices))
@@ -337,20 +337,25 @@ class RexProBaseConnection(object):
                 try:
                     self._conn.connect((self.current_host, self.current_port))
 
-                    # indicates that we're in a transaction
-                    self._in_transaction = False
-
-                    # stores the session key
-                    self._session_key = None
-                    self._opened = True
-                    self._open_session()
-                    break
-
                 except Exception as e:
                     self.connection_failed()
                     logger.exception("Could not connect to database: %s" % e)
-            else:
-                raise RexProConnectionException("Could not connect to database: %s")
+
+            try:
+                # indicates that we're in a transaction
+                self._in_transaction = False
+
+                # stores the session key
+                self._session_key = None
+                self._opened = True
+                self._open_session()
+            except Exception, e:
+                soft = False
+                self.connection_failed()
+                logger.exception("Could not connect to database: %s" % e)
+                if i >= CONNECTION_ATTEMPTS - 1:
+                    raise
+
 
     def test_connection(self):
         """ Test the socket, if it's errored or closed out, try to reconnect. Otherwise raise and Exception """
