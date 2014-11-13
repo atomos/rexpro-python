@@ -1,4 +1,5 @@
 import random
+from celery.utils.log import get_task_logger
 from contextlib import contextmanager
 from socket import SHUT_RDWR
 
@@ -6,6 +7,8 @@ from rexpro import exceptions, messages
 from rexpro.exceptions import RexProConnectionException
 from rexpro.messages import ErrorResponse
 
+logger = get_task_logger(__name__)
+CONNECTION_ATTEMPTS = 3
 
 class RexProBaseConnectionPool(object):
     """ Base RexProConnectionPool Framework
@@ -215,6 +218,11 @@ class RexProBaseConnection(object):
         self._session_key = None
         self._opened = False
 
+        self.port_blacklist = set()
+        self.host_blacklist = set()
+        self.current_host = None
+        self.current_port = None
+
         self.open()
 
     def _select(self, rlist, wlist, xlist, timeout=None):
@@ -285,6 +293,22 @@ class RexProBaseConnection(object):
         if isinstance(response, ErrorResponse):
             response.raise_exception()
 
+    def connection_failed(self):
+        """When a connection fails, it is added to the blacklist and a new one is tried. It is never added back to the pool
+        for this particular connection unless all hosts have been added to the blacklist. In the future we may want to add
+        a mechanism to reattempt connection after a delay"""
+
+        self.port_blacklist.add(self.current_port)
+        self.host_blacklist.add(self.current_host)
+
+        if len(self.host_blacklist) >= len(self.host):
+            self.host_blacklist = set()
+        if len(self.port_blacklist) >= len(self.port):
+            self.port_blacklist = set()
+
+        logger.error(u"Connection failed on host {} and port {}. Current blacklist is host={} post={}".format(
+            self.current_host, self.current_port, self.host_blacklist, self.port_blacklist))
+
     def open(self, soft=False):
         """ open the connection to the database
 
@@ -296,28 +320,37 @@ class RexProBaseConnection(object):
             self._conn = self.SOCKET_CLASS()
             self._conn.settimeout(self.timeout)
 
-            if isinstance(self.host, list):
-                host = random.choice(self.host)
+
+            for i in range(CONNECTION_ATTEMPTS):
+                if isinstance(self.host, list):
+                    host_choices = set(self.host) - self.host_blacklist
+                    self.current_host = random.choice(list(host_choices))
+                else:
+                    self.current_host = self.host
+
+                if isinstance(self.port, list):
+                    port_choices = set(self.port) - self.port_blacklist
+                    self.current_port = random.choice(list(port_choices))
+                else:
+                    self.current_port = self.port
+
+                try:
+                    self._conn.connect((self.current_host, self.current_port))
+
+                    # indicates that we're in a transaction
+                    self._in_transaction = False
+
+                    # stores the session key
+                    self._session_key = None
+                    self._opened = True
+                    self._open_session()
+                    break
+
+                except Exception as e:
+                    self.connection_failed()
+                    logger.exception("Could not connect to database: %s" % e)
             else:
-                host = self.host
-
-            if isinstance(self.port, list):
-                port = random.choice(self.port)
-            else:
-                port = self.port
-
-            try:
-                self._conn.connect((host, port))
-            except Exception as e:
-                raise RexProConnectionException("Could not connect to database: %s" % e)
-
-        # indicates that we're in a transaction
-        self._in_transaction = False
-
-        # stores the session key
-        self._session_key = None
-        self._opened = True
-        self._open_session()
+                raise RexProConnectionException("Could not connect to database: %s")
 
     def test_connection(self):
         """ Test the socket, if it's errored or closed out, try to reconnect. Otherwise raise and Exception """
@@ -385,21 +418,33 @@ class RexProBaseConnection(object):
 
         :rtype: list
         """
-        if self._in_transaction:
-            transaction = False
+        for i in range(CONNECTION_ATTEMPTS):
+            try:
+                if self._in_transaction:
+                    transaction = False
 
-        self._conn.send_message(
-            messages.ScriptRequest(
-                script=script,
-                params=params,
-                session_key=self._session_key,
-                isolate=isolate,
-                in_transaction=transaction,
-            )
-        )
-        response = self._conn.get_response()
+                print script, params
+                import traceback
+                print traceback.format_exc()
 
-        if isinstance(response, messages.ErrorResponse):
-            response.raise_exception()
+                self._conn.send_message(
+                    messages.ScriptRequest(
+                        script=script,
+                        params=params,
+                        session_key=self._session_key,
+                        isolate=isolate,
+                        in_transaction=transaction,
+                    )
+                )
+                response = self._conn.get_response()
 
-        return response.results
+                if isinstance(response, messages.ErrorResponse):
+                    response.raise_exception()
+                return response.results
+
+            except Exception, e:
+                self.connection_failed()
+                logger.exception("Received an exception executing query! {}".format(e))
+                if i >= CONNECTION_ATTEMPTS - 1:
+                    raise
+
