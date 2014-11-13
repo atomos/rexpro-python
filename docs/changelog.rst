@@ -5,6 +5,14 @@ ChangeLog
 
 Changes to the library are recorded here.
 
+v0.3.3
+------
+  * Fix Pooling issue: always return connections back to the pool by nvie
+
+v0.3.2
+------
+  * Support None in response
+
 v0.3.1
 ------
   * Transaction handling fix by nvie

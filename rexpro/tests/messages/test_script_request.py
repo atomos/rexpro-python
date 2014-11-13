@@ -162,3 +162,13 @@ class TestRexProScriptRequestMessage(BaseRexProTestCase):
     def test_object_persistence_within_transactions(self):
         """ Tests that objects defined in one request are available in the next, within an open transaction """
         pass
+
+    @attr('test_double')
+    def test_full_double(self):
+        conn = self.get_connection()
+
+        script = "try { g.makeKey('testdouble').dataType(FullDouble.class).make() } catch (err) { }; v = g.addVertex(); v.testdouble = value; g.commit(); return v"
+
+        response = conn.execute(script, {'value': 1.2345678901234567890})
+
+        self.assertEqual(response['_properties']['testdouble'], 1.2345678901234567890)
