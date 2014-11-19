@@ -349,13 +349,14 @@ class RexProBaseConnection(object):
                 self._session_key = None
                 self._opened = True
                 self._open_session()
+                return
+
             except Exception, e:
                 soft = False
                 self.connection_failed()
                 logger.exception("Could not connect to database: %s" % e)
                 if i >= CONNECTION_ATTEMPTS - 1:
                     raise
-
 
     def test_connection(self):
         """ Test the socket, if it's errored or closed out, try to reconnect. Otherwise raise and Exception """
