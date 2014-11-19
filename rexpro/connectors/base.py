@@ -340,6 +340,7 @@ class RexProBaseConnection(object):
                 except Exception as e:
                     self.connection_failed()
                     logger.exception("Could not connect to database: %s" % e)
+                    continue
 
             try:
                 # indicates that we're in a transaction
