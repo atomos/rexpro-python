@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from socket import SHUT_RDWR
 
 from rexpro import exceptions, messages
-from rexpro.exceptions import RexProConnectionException
+from rexpro.exceptions import RexProConnectionException, RexProInvalidSessionException
 from rexpro.messages import ErrorResponse
 
 logger = get_task_logger(__name__)
@@ -306,9 +306,6 @@ class RexProBaseConnection(object):
         if len(self.port_blacklist) >= len(self.port):
             self.port_blacklist = set()
 
-        logger.error(u"Connection failed on host {} and port {}. Current blacklist is host={} post={}".format(
-            self.current_host, self.current_port, self.host_blacklist, self.port_blacklist))
-
     def open(self, soft=False):
         """ open the connection to the database
 
@@ -339,7 +336,10 @@ class RexProBaseConnection(object):
 
                 except Exception as e:
                     self.connection_failed()
-                    logger.exception("Could not connect to database: %s" % e)
+
+                    logger.error(u"Titan query failed on host {} and port {}: {}. Current client is host={} post={}".format(
+                        self.current_host, self.current_port, e, self.host_blacklist, self.port_blacklist))
+
                     continue
 
             try:
@@ -449,7 +449,14 @@ class RexProBaseConnection(object):
 
             except Exception, e:
                 self.connection_failed()
-                logger.exception("Received an exception executing query! {}".format(e))
+
+                # RexProInvalidSessionException happens frequently when a session is idle for too long so not logging an error
+                log_handler = logger.info if isinstance(e, RexProInvalidSessionException) else logger.error
+                log_handler("Received an exception executing query! {}".format(e))
+
                 if i >= CONNECTION_ATTEMPTS - 1:
                     raise
+                else:
+                    self.close()
+                    self.open()
 
