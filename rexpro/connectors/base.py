@@ -212,7 +212,6 @@ class RexProBaseConnection(object):
         self.password = password
         self.timeout = timeout
 
-        self.graph_features = None
         self._conn = None
         self._in_transaction = False
         self._session_key = None
@@ -241,8 +240,6 @@ class RexProBaseConnection(object):
         if isinstance(response, ErrorResponse):
             response.raise_exception()
         self._session_key = response.session_key
-
-        self.graph_features = self.execute('g.getFeatures().toMap()')
 
     def open_transaction(self):
         """ opens a transaction """
