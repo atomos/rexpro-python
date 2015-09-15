@@ -298,10 +298,11 @@ class RexProBaseConnection(object):
             # connect to server
             self._conn = self.SOCKET_CLASS()
             self._conn.settimeout(self.timeout)
-            try:
-                self._conn.connect((self.host, self.port))
-            except Exception as e:
-                raise RexProConnectionException("Could not connect to database: %s" % e)
+            #try:
+            print "ABC ", self.host, " ", self.port
+            self._conn.connect((self.host, self.port))
+            #except Exception as e:
+            #    raise RexProConnectionException("Could not connect to database: %s" % e)
 
         # indicates that we're in a transaction
         self._in_transaction = False
@@ -377,6 +378,7 @@ class RexProBaseConnection(object):
 
         :rtype: list
         """
+        print "Hiya!"
         if self._in_transaction:
             transaction = False
 
@@ -387,7 +389,8 @@ class RexProBaseConnection(object):
                 session_key=self._session_key,
                 isolate=isolate,
                 in_transaction=transaction,
-            )
+                load="test3",
+            ),
         )
         response = self._conn.get_response()
 
